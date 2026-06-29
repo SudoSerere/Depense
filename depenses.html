@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mes dépenses</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F7F6F3;
+      --surface: #FFFFFF;
+      --surface-2: #F0EEE9;
+      --border: #E2DFD8;
+      --text-primary: #1A1916;
+      --text-secondary: #6B6860;
+      --text-muted: #9E9B94;
+      --accent: #D4541A;
+      --danger: #C0392B;
+      --green-bg: #E6F4EA;
+      --green-text: #1B5E20;
+      --green-label: #2E6E3A;
+      --red-bg: #FDECEC;
+      --red-label: #7B2020;
+      --radius: 10px;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 920px; margin: 0 auto; }
+
+    header { margin-bottom: 2rem; }
+    header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+    header p  { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 310px 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    @media (max-width: 680px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .left  { display: flex; flex-direction: column; gap: 0.875rem; }
+    .right { display: flex; flex-direction: column; gap: 0.875rem; }
+
+    /* Card base */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.125rem;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    /* Salary */
+    .salary-row { display: flex; align-items: center; gap: 8px; }
+    .salary-row input {
+      font-family: var(--font);
+      font-size: 20px;
+      font-weight: 600;
+      flex: 1;
+      letter-spacing: -0.3px;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      outline: none;
+    }
+    .salary-row input::placeholder { color: var(--text-muted); }
+    .salary-unit { font-size: 13px; color: var(--text-muted); }
+
+    /* Summary */
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric { background: var(--surface-2); border-radius: 8px; padding: 0.75rem 0.875rem; transition: background 0.2s; }
+    .metric.wide { grid-column: span 2; }
+    .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 3px; transition: color 0.2s; }
+    .metric-value { font-size: 18px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .metric-value.danger { color: var(--danger); }
+
+    .progress-bar-wrap { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .progress-bar { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.35s ease, background 0.2s; }
+    .progress-bar.over { background: var(--danger); }
+
+    /* Form inputs */
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+    .field:last-of-type { margin-bottom: 0; }
+    .field label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text-primary);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 9px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); background: var(--surface); }
+
+    .add-btn {
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 7px;
+      padding: 9px 18px;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: opacity 0.15s;
+    }
+    .add-btn:hover  { opacity: 0.88; }
+    .add-btn:active { opacity: 0.72; }
+
+    /* List */
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .export-btn {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .export-btn:hover    { background: var(--border); }
+    .export-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Category sections */
+    .cat-section { margin-bottom: 14px; }
+    .cat-section:last-child { margin-bottom: 0; }
+
+    .cat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .cat-label-total { font-variant-numeric: tabular-nums; }
+
+    /* Expense rows */
+    .expense-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 0.5px solid var(--border);
+      animation: fadeIn 0.18s ease;
+    }
+    .expense-row:last-child { border-bottom: none; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .expense-desc {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .amount-display {
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 68px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      border-radius: 5px;
+      padding: 2px 5px;
+      transition: background 0.15s;
+    }
+    .amount-display:hover { background: var(--surface-2); }
+
+    .amount-input {
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      width: 80px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      background: var(--surface-2);
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      padding: 2px 5px;
+      outline: none;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 0 3px;
+      flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .delete-btn:hover { color: var(--danger); }
+
+    /* Total row */
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 0;
+      margin-top: 6px;
+      border-top: 2px solid var(--text-primary);
+    }
+    .total-row span:first-child { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .total-row span:last-child  { font-size: 15px; font-weight: 700; color: var(--danger); font-variant-numeric: tabular-nums; }
+
+    .empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 2.5rem 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Mes dépenses</h1>
+    <p>Suivi personnel des dépenses</p>
+  </header>
+
+  <div class="layout">
+
+    <!-- LEFT -->
+    <div class="left">
+
+      <div class="card">
+        <div class="card-title">Salaire net</div>
+        <div class="salary-row">
+          <input type="number" id="salary" placeholder="0" min="0" step="1" oninput="onSalaryChange()" />
+          <span class="salary-unit">€ / mois</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="summary-grid">
+          <div class="metric wide">
+            <div class="metric-label">Total dépenses</div>
+            <div class="metric-value danger" id="total">0,00 €</div>
+            <div class="progress-bar-wrap"><div class="progress-bar" id="progress" style="width:0%"></div></div>
+          </div>
+          <div class="metric" id="metric-epargne">
+            <div class="metric-label" id="label-epargne">Épargne</div>
+            <div class="metric-value" id="epargne">— €</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Nb dépenses</div>
+            <div class="metric-value" id="count">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Nouvelle dépense</div>
+        <div class="field">
+          <label for="desc">Description</label>
+          <input type="text" id="desc" placeholder="ex : loyer" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="amount">Montant (€)</label>
+          <input type="number" id="amount" placeholder="0,00" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="cat">Catégorie</label>
+          <select id="cat">
+            <option value="Charges">Charges</option>
+            <option value="Famille">Famille</option>
+            <option value="Divers">Divers</option>
+          </select>
+        </div>
+        <button class="add-btn" onclick="addExpense()">Ajouter ↗</button>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right">
+      <div class="card">
+        <div class="list-header">
+          <span class="card-title" style="margin-bottom:0">Historique</span>
+          <button class="export-btn" onclick="exportCSV()" id="export-btn" disabled>↓ Exporter CSV</button>
+        </div>
+        <div id="list"><div class="empty">Aucune dépense enregistrée</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY        = 'depenses_tonygas';
+  const STORAGE_SALARY_KEY = 'depenses_tonygas_salary';
+  const CATS               = ['Charges', 'Famille', 'Divers'];
+
+  let expenses  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  let editingId = null;
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem(STORAGE_SALARY_KEY);
+    if (saved) document.getElementById('salary').value = saved;
+    render();
+  });
+
+  function saveExpenses() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+  }
+
+  function onSalaryChange() {
+    localStorage.setItem(STORAGE_SALARY_KEY, document.getElementById('salary').value);
+    render();
+  }
+
+  function fmt(n) {
+    return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  }
+
+  function render() {
+    const total   = expenses.reduce((s, e) => s + e.amount, 0);
+    const salary  = parseFloat(document.getElementById('salary').value) || 0;
+    const epargne = salary - total;
+    const pct     = salary > 0 ? Math.min((total / salary) * 100, 100) : 0;
+
+    document.getElementById('total').textContent = fmt(total);
+    document.getElementById('count').textContent = expenses.length;
+    document.getElementById('export-btn').disabled = expenses.length === 0;
+
+    const bar = document.getElementById('progress');
+    bar.style.width = pct + '%';
+    bar.className   = 'progress-bar' + (pct >= 100 ? ' over' : '');
+
+    const epEl  = document.getElementById('epargne');
+    const metEl = document.getElementById('metric-epargne');
+    const lbEl  = document.getElementById('label-epargne');
+
+    if (salary > 0) {
+      epEl.textContent       = fmt(epargne);
+      const pos              = epargne >= 0;
+      metEl.style.background = pos ? 'var(--green-bg)' : 'var(--red-bg)';
+      lbEl.style.color       = pos ? 'var(--green-label)' : 'var(--red-label)';
+      epEl.style.color       = pos ? 'var(--green-text)' : 'var(--danger)';
+    } else {
+      epEl.textContent       = '— €';
+      epEl.style.color       = '';
+      metEl.style.background = '';
+      lbEl.style.color       = '';
+    }
+
+    const list = document.getElementById('list');
+
+    if (!expenses.length) {
+      list.innerHTML = '<div class="empty">Aucune dépense enregistrée</div>';
+      return;
+    }
+
+    let html = '';
+
+    CATS.forEach(cat => {
+      const items = expenses.filter(e => e.cat === cat);
+      if (!items.length) return;
+      const catTotal = items.reduce((s, e) => s + e.amount, 0);
+
+      html += `<div class="cat-section">
+        <div class="cat-label">
+          <span>${cat}</span>
+          <span class="cat-label-total">${fmt(catTotal)}</span>
+        </div>`;
+
+      items.slice().reverse().forEach(e => {
+        const isEditing = editingId === e.id;
+        html += `<div class="expense-row" id="row-${e.id}">
+          <span class="expense-desc" title="${e.desc}">${e.desc}</span>
+          ${isEditing
+            ? `<input class="amount-input" id="input-${e.id}" type="number"
+                 value="${e.amount}" min="0" step="0.01"
+                 onblur="commitEdit(${e.id})"
+                 onkeydown="onEditKey(event, ${e.id})" />`
+            : `<span class="amount-display" onclick="startEdit(${e.id})" title="Cliquer pour modifier">${fmt(e.amount)}</span>`
+          }
+          <button class="delete-btn" onclick="deleteExpense(${e.id})" aria-label="Supprimer">✕</button>
+        </div>`;
+      });
+
+      html += `</div>`;
+    });
+
+    html += `<div class="total-row">
+      <span>Total</span>
+      <span>${fmt(total)}</span>
+    </div>`;
+
+    list.innerHTML = html;
+
+    if (editingId !== null) {
+      const inp = document.getElementById(`input-${editingId}`);
+      if (inp) { inp.focus(); inp.select(); }
+    }
+  }
+
+  function startEdit(id) {
+    editingId = id;
+    render();
+  }
+
+  function commitEdit(id) {
+    const inp = document.getElementById(`input-${id}`);
+    if (!inp) return;
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && val > 0) {
+      const e = expenses.find(e => e.id === id);
+      if (e) { e.amount = val; saveExpenses(); }
+    }
+    editingId = null;
+    render();
+  }
+
+  function onEditKey(event, id) {
+    if (event.key === 'Enter')  commitEdit(id);
+    if (event.key === 'Escape') { editingId = null; render(); }
+  }
+
+  function addExpense() {
+    const desc   = document.getElementById('desc').value.trim();
+    const amount = parseFloat(document.getElementById('amount').value);
+    const cat    = document.getElementById('cat').value;
+    if (!desc || isNaN(amount) || amount <= 0) return;
+    expenses.push({ id: Date.now(), desc, amount, cat });
+    saveExpenses();
+    document.getElementById('desc').value   = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('desc').focus();
+    render();
+  }
+
+  function deleteExpense(id) {
+    expenses = expenses.filter(e => e.id !== id);
+    if (editingId === id) editingId = null;
+    saveExpenses();
+    render();
+  }
+
+  function exportCSV() {
+    if (!expenses.length) return;
+    const total  = expenses.reduce((s, e) => s + e.amount, 0);
+    const salary = parseFloat(document.getElementById('salary').value) || 0;
+    const rows   = [['#', 'Description', 'Catégorie', 'Montant (€)']];
+    let i = 1;
+    CATS.forEach(cat => {
+      expenses.filter(e => e.cat === cat).forEach(e => {
+        rows.push([i++, e.desc, e.cat, e.amount.toFixed(2).replace('.', ',')]);
+      });
+    });
+    rows.push(
+      [],
+      ['', 'Total dépenses', '', total.toFixed(2).replace('.', ',')],
+      ['', 'Salaire net',    '', salary.toFixed(2).replace('.', ',')],
+      ['', 'Épargne',        '', (salary - total).toFixed(2).replace('.', ',')]
+    );
+    const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'depenses.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.id !== `input-${editingId}`) addExpense();
+  });
+</script>
+</body>
+</html>
