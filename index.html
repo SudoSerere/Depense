@@ -323,7 +323,11 @@
       <div class="card">
         <div class="list-header">
           <span class="card-title" style="margin-bottom:0">Historique</span>
-          <button class="export-btn" onclick="exportCSV()" id="export-btn" disabled>↓ Exporter CSV</button>
+          <div style="display:flex; gap:6px;">
+            <button class="export-btn" onclick="document.getElementById('import-file').click()">↑ Importer CSV</button>
+            <button class="export-btn" onclick="exportCSV()" id="export-btn" disabled>↓ Exporter CSV</button>
+          </div>
+          <input type="file" id="import-file" accept=".csv,text/csv" style="display:none" onchange="importCSV(event)" />
         </div>
         <div id="list"><div class="empty">Aucune dépense enregistrée</div></div>
       </div>
@@ -501,11 +505,75 @@
       ['', 'Épargne',        '', (salary - total).toFixed(2).replace('.', ',')]
     );
     const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = 'depenses.csv'; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function parseCSVLine(line) {
+    const cells = [];
+    let cur = '', inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+      } else {
+        if (ch === '"') inQuotes = true;
+        else if (ch === ';') { cells.push(cur); cur = ''; }
+        else cur += ch;
+      }
+    }
+    cells.push(cur);
+    return cells;
+  }
+
+  function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text  = String(reader.result).replace(/^﻿/, '');
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      const imported = [];
+      let importedSalary = null;
+
+      lines.forEach(line => {
+        const cells = parseCSVLine(line).map(c => c.trim());
+        if (cells.length < 4) return;
+        const [num, desc, cat, montant] = cells;
+        const amount = parseFloat(montant.replace(/\s/g, '').replace(',', '.'));
+
+        if (/^\d+$/.test(num) && desc && CATS.includes(cat) && !isNaN(amount) && amount > 0) {
+          imported.push({ id: Date.now() + imported.length, desc, amount, cat });
+        } else if (desc === 'Salaire net' && !isNaN(amount) && amount > 0) {
+          importedSalary = amount;
+        }
+      });
+
+      if (!imported.length) {
+        alert("Aucune dépense valide trouvée dans ce fichier. Utilise un CSV exporté depuis cette application.");
+      } else {
+        if (expenses.length && !confirm(`Importer ${imported.length} dépense(s) ? La liste actuelle sera remplacée.`)) {
+          event.target.value = '';
+          return;
+        }
+        expenses  = imported;
+        editingId = null;
+        saveExpenses();
+        if (importedSalary !== null) {
+          document.getElementById('salary').value = importedSalary;
+          localStorage.setItem(STORAGE_SALARY_KEY, String(importedSalary));
+        }
+        render();
+      }
+      event.target.value = '';
+    };
+    reader.readAsText(file, 'utf-8');
   }
 
   document.addEventListener('keydown', e => {
