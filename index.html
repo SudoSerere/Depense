@@ -194,6 +194,14 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    .expense-checkbox {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
     .expense-desc {
       flex: 1;
       font-size: 13px;
@@ -201,7 +209,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      transition: color 0.15s;
     }
+
+    .expense-row.paid .expense-desc { color: var(--text-muted); text-decoration: line-through; }
+    .expense-row.paid .amount-display { color: var(--text-muted); }
 
     .amount-display {
       font-size: 13px;
@@ -284,6 +296,10 @@
             <div class="metric-value danger" id="total">0,00 €</div>
             <div class="progress-bar-wrap"><div class="progress-bar" id="progress" style="width:0%"></div></div>
           </div>
+          <div class="metric wide" id="metric-restant">
+            <div class="metric-label" id="label-restant">Reste à payer</div>
+            <div class="metric-value" id="restant">0,00 €</div>
+          </div>
           <div class="metric" id="metric-epargne">
             <div class="metric-label" id="label-epargne">Épargne</div>
             <div class="metric-value" id="epargne">— €</div>
@@ -364,14 +380,29 @@
   }
 
   function render() {
-    const total   = expenses.reduce((s, e) => s + e.amount, 0);
-    const salary  = parseFloat(document.getElementById('salary').value) || 0;
-    const epargne = salary - total;
-    const pct     = salary > 0 ? Math.min((total / salary) * 100, 100) : 0;
+    const total    = expenses.reduce((s, e) => s + e.amount, 0);
+    const restant  = expenses.reduce((s, e) => s + (e.paid ? 0 : e.amount), 0);
+    const nbRestant = expenses.filter(e => !e.paid).length;
+    const salary   = parseFloat(document.getElementById('salary').value) || 0;
+    const epargne  = salary - total;
+    const pct      = salary > 0 ? Math.min((total / salary) * 100, 100) : 0;
 
     document.getElementById('total').textContent = fmt(total);
     document.getElementById('count').textContent = expenses.length;
     document.getElementById('export-btn').disabled = expenses.length === 0;
+
+    const restantEl = document.getElementById('restant');
+    const restantLbl = document.getElementById('label-restant');
+    restantEl.textContent = fmt(restant);
+    if (expenses.length && restant === 0) {
+      restantLbl.textContent = 'Reste à payer';
+      restantEl.className = 'metric-value';
+      restantEl.style.color = 'var(--green-text)';
+    } else {
+      restantLbl.textContent = `Reste à payer (${nbRestant})`;
+      restantEl.className = 'metric-value danger';
+      restantEl.style.color = '';
+    }
 
     const bar = document.getElementById('progress');
     bar.style.width = pct + '%';
@@ -416,7 +447,9 @@
 
       items.slice().reverse().forEach(e => {
         const isEditing = editingId === e.id;
-        html += `<div class="expense-row" id="row-${e.id}">
+        html += `<div class="expense-row${e.paid ? ' paid' : ''}" id="row-${e.id}">
+          <input type="checkbox" class="expense-checkbox" ${e.paid ? 'checked' : ''}
+            onchange="togglePaid(${e.id})" title="${e.paid ? 'Marquer comme non payé' : 'Marquer comme payé'}" />
           <span class="expense-desc" title="${e.desc}">${e.desc}</span>
           ${isEditing
             ? `<input class="amount-input" id="input-${e.id}" type="number"
@@ -467,12 +500,18 @@
     if (event.key === 'Escape') { editingId = null; render(); }
   }
 
+  function togglePaid(id) {
+    const e = expenses.find(e => e.id === id);
+    if (e) { e.paid = !e.paid; saveExpenses(); }
+    render();
+  }
+
   function addExpense() {
     const desc   = document.getElementById('desc').value.trim();
     const amount = parseFloat(document.getElementById('amount').value);
     const cat    = document.getElementById('cat').value;
     if (!desc || isNaN(amount) || amount <= 0) return;
-    expenses.push({ id: Date.now(), desc, amount, cat });
+    expenses.push({ id: Date.now(), desc, amount, cat, paid: false });
     saveExpenses();
     document.getElementById('desc').value   = '';
     document.getElementById('amount').value = '';
@@ -489,20 +528,22 @@
 
   function exportCSV() {
     if (!expenses.length) return;
-    const total  = expenses.reduce((s, e) => s + e.amount, 0);
-    const salary = parseFloat(document.getElementById('salary').value) || 0;
-    const rows   = [['#', 'Description', 'Catégorie', 'Montant (€)']];
+    const total   = expenses.reduce((s, e) => s + e.amount, 0);
+    const restant = expenses.reduce((s, e) => s + (e.paid ? 0 : e.amount), 0);
+    const salary  = parseFloat(document.getElementById('salary').value) || 0;
+    const rows    = [['#', 'Description', 'Catégorie', 'Montant (€)', 'Payé']];
     let i = 1;
     CATS.forEach(cat => {
       expenses.filter(e => e.cat === cat).forEach(e => {
-        rows.push([i++, e.desc, e.cat, e.amount.toFixed(2).replace('.', ',')]);
+        rows.push([i++, e.desc, e.cat, e.amount.toFixed(2).replace('.', ','), e.paid ? 'Oui' : 'Non']);
       });
     });
     rows.push(
       [],
-      ['', 'Total dépenses', '', total.toFixed(2).replace('.', ',')],
-      ['', 'Salaire net',    '', salary.toFixed(2).replace('.', ',')],
-      ['', 'Épargne',        '', (salary - total).toFixed(2).replace('.', ',')]
+      ['', 'Total dépenses',  '', total.toFixed(2).replace('.', ','), ''],
+      ['', 'Reste à payer',   '', restant.toFixed(2).replace('.', ','), ''],
+      ['', 'Salaire net',     '', salary.toFixed(2).replace('.', ','), ''],
+      ['', 'Épargne',         '', (salary - total).toFixed(2).replace('.', ','), '']
     );
     const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -545,11 +586,12 @@
       lines.forEach(line => {
         const cells = parseCSVLine(line).map(c => c.trim());
         if (cells.length < 4) return;
-        const [num, desc, cat, montant] = cells;
+        const [num, desc, cat, montant, payeStr] = cells;
         const amount = parseFloat(montant.replace(/\s/g, '').replace(',', '.'));
 
         if (/^\d+$/.test(num) && desc && CATS.includes(cat) && !isNaN(amount) && amount > 0) {
-          imported.push({ id: Date.now() + imported.length, desc, amount, cat });
+          const paid = (payeStr || '').trim().toLowerCase() === 'oui';
+          imported.push({ id: Date.now() + imported.length, desc, amount, cat, paid });
         } else if (desc === 'Salaire net' && !isNaN(amount) && amount > 0) {
           importedSalary = amount;
         }
