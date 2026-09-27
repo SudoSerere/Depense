@@ -274,6 +274,21 @@
       outline: none;
     }
 
+    .tag-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+      border: 1.5px solid var(--border);
+      transition: transform 0.1s, border-color 0.15s;
+    }
+    .tag-dot:hover     { transform: scale(1.2); }
+    .tag-dot.tag-green { background: #2E8B47; border-color: #2E8B47; }
+    .tag-dot.tag-red   { background: var(--danger); border-color: var(--danger); }
+
     .delete-btn {
       background: none;
       border: none;
@@ -299,6 +314,38 @@
     .total-row span:last-child  { font-size: 15px; font-weight: 700; color: var(--danger); font-variant-numeric: tabular-nums; }
 
     .empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 2.5rem 0; }
+
+    /* Sync card */
+    .sync-hint { font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 8px; }
+    .sync-status { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+    .sync-status.ok      { color: var(--green-label); }
+    .sync-status.error   { color: var(--danger); }
+    .sync-status.syncing { color: var(--accent); }
+    .sync-autotoggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .sync-autotoggle input { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+    .sync-actions { display: flex; gap: 6px; }
+    .sync-actions .export-btn { flex: 1; text-align: center; }
+    .sync-disconnect-btn {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      cursor: pointer;
+      margin-top: 10px;
+      text-align: center;
+      text-decoration: underline;
+    }
+    .sync-disconnect-btn:hover { color: var(--danger); }
   </style>
 </head>
 <body>
@@ -364,6 +411,34 @@
         <button class="add-btn" onclick="addExpense()">Ajouter ↗</button>
       </div>
 
+      <div class="card">
+        <div class="card-title">Synchronisation GitHub</div>
+        <div id="sync-disconnected">
+          <div class="field">
+            <label for="gh-token">Token d'accès (GitHub)</label>
+            <input type="password" id="gh-token" placeholder="github_pat_xxx" autocomplete="off" />
+          </div>
+          <button class="add-btn" onclick="connectGitHub()">Connecter</button>
+          <p class="sync-hint">
+            Crée un <em>fine-grained personal access token</em> sur GitHub, limité au dépôt
+            <strong>Depense</strong>, avec la permission <strong>Contents: Read and write</strong>.
+            Il reste uniquement dans ce navigateur.
+          </p>
+        </div>
+        <div id="sync-connected" class="hidden">
+          <div class="sync-status" id="sync-status">—</div>
+          <label class="sync-autotoggle">
+            <input type="checkbox" id="gh-autosync" onchange="toggleAutoSync()" />
+            Synchroniser automatiquement
+          </label>
+          <div class="sync-actions">
+            <button class="export-btn" id="sync-push-btn" onclick="ghPushData()">☁ Sauvegarder en ligne</button>
+            <button class="export-btn" id="sync-pull-btn" onclick="ghPullData(true)">↻ Recharger</button>
+          </div>
+          <button class="sync-disconnect-btn" onclick="disconnectGitHub()">Déconnecter cet appareil</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- RIGHT -->
@@ -393,18 +468,205 @@
   let editingId = null;
   let editingField = null; // 'amount' | 'desc'
 
+  // ---------------------------------------------------------------------------
+  // Synchronisation GitHub (data.json dans le dépôt)
+  // ---------------------------------------------------------------------------
+  const GH_OWNER          = 'SudoSerere';
+  const GH_REPO           = 'Depense';
+  const GH_BRANCH         = 'main';
+  const GH_DATA_PATH      = 'data.json';
+  const GH_TOKEN_KEY      = 'depenses_tonygas_gh_token';
+  const GH_AUTOSYNC_KEY   = 'depenses_tonygas_gh_autosync';
+
+  let ghToken      = localStorage.getItem(GH_TOKEN_KEY) || '';
+  let ghAutoSync   = localStorage.getItem(GH_AUTOSYNC_KEY) === '1';
+  let ghFileSha    = null;
+  let ghSyncTimer  = null;
+  let ghSyncing    = false;
+  let ghLastSyncAt = null;
+  let ghLastError  = null;
+
+  function utf8ToB64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    bytes.forEach(b => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+  }
+
+  function b64ToUtf8(b64) {
+    const binary = atob(b64.replace(/\n/g, ''));
+    const bytes  = Uint8Array.from(binary, c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function ghHeaders() {
+    return {
+      Authorization: `Bearer ${ghToken}`,
+      Accept: 'application/vnd.github+json'
+    };
+  }
+
+  async function ghFetchData() {
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_DATA_PATH}?ref=${GH_BRANCH}`,
+      { headers: ghHeaders() }
+    );
+    if (res.status === 404) { ghFileSha = null; return null; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Lecture GitHub échouée (${res.status})`);
+    }
+    const json = await res.json();
+    ghFileSha = json.sha;
+    return JSON.parse(b64ToUtf8(json.content));
+  }
+
+  async function ghPushData() {
+    if (!ghToken) return;
+    ghSyncing = true;
+    renderSyncUI();
+    try {
+      const payload = {
+        salary: document.getElementById('salary').value || '',
+        expenses
+      };
+      const body = {
+        message: `Mise à jour dépenses — ${new Date().toLocaleString('fr-FR')}`,
+        content: utf8ToB64(JSON.stringify(payload, null, 2)),
+        branch: GH_BRANCH
+      };
+      if (ghFileSha) body.sha = ghFileSha;
+
+      const res = await fetch(
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_DATA_PATH}`,
+        { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Échec de l'envoi (${res.status})`);
+      }
+      const json = await res.json();
+      ghFileSha    = json.content.sha;
+      ghLastSyncAt = new Date();
+      ghLastError  = null;
+    } catch (err) {
+      ghLastError = err.message;
+    } finally {
+      ghSyncing = false;
+      renderSyncUI();
+    }
+  }
+
+  async function ghPullData(isManual) {
+    if (!ghToken) return;
+    if (isManual && expenses.length &&
+        !confirm("Recharger depuis GitHub ? Les données locales non synchronisées seront remplacées par celles du dépôt.")) {
+      return;
+    }
+    ghSyncing = true;
+    renderSyncUI();
+    try {
+      const data = await ghFetchData();
+      if (data) {
+        expenses = Array.isArray(data.expenses) ? data.expenses : [];
+        saveExpensesRaw();
+        if (data.salary !== undefined && data.salary !== '') {
+          document.getElementById('salary').value = data.salary;
+          localStorage.setItem(STORAGE_SALARY_KEY, String(data.salary));
+        }
+      }
+      ghLastSyncAt = new Date();
+      ghLastError  = null;
+      render();
+    } catch (err) {
+      ghLastError = err.message;
+    } finally {
+      ghSyncing = false;
+      renderSyncUI();
+    }
+  }
+
+  function scheduleAutoSync() {
+    if (!ghAutoSync || !ghToken) return;
+    clearTimeout(ghSyncTimer);
+    ghSyncTimer = setTimeout(ghPushData, 2000);
+  }
+
+  function connectGitHub() {
+    const val = document.getElementById('gh-token').value.trim();
+    if (!val) return;
+    ghToken = val;
+    localStorage.setItem(GH_TOKEN_KEY, ghToken);
+    document.getElementById('gh-token').value = '';
+    ghLastError = null;
+    renderSyncUI();
+    ghPullData(false);
+  }
+
+  function disconnectGitHub() {
+    if (!confirm("Déconnecter GitHub sur cet appareil ? Le token sera supprimé de ce navigateur (les données déjà sauvegardées sur GitHub ne sont pas affectées).")) return;
+    ghToken      = '';
+    ghFileSha    = null;
+    ghLastSyncAt = null;
+    ghLastError  = null;
+    localStorage.removeItem(GH_TOKEN_KEY);
+    renderSyncUI();
+  }
+
+  function toggleAutoSync() {
+    ghAutoSync = document.getElementById('gh-autosync').checked;
+    localStorage.setItem(GH_AUTOSYNC_KEY, ghAutoSync ? '1' : '0');
+    if (ghAutoSync) scheduleAutoSync();
+  }
+
+  function renderSyncUI() {
+    const disc = document.getElementById('sync-disconnected');
+    const conn = document.getElementById('sync-connected');
+    const hasToken = !!ghToken;
+    disc.classList.toggle('hidden', hasToken);
+    conn.classList.toggle('hidden', !hasToken);
+    if (!hasToken) return;
+
+    document.getElementById('gh-autosync').checked = ghAutoSync;
+    const statusEl = document.getElementById('sync-status');
+    document.getElementById('sync-push-btn').disabled = ghSyncing;
+    document.getElementById('sync-pull-btn').disabled = ghSyncing;
+
+    if (ghSyncing) {
+      statusEl.textContent = 'Synchronisation en cours…';
+      statusEl.className = 'sync-status syncing';
+    } else if (ghLastError) {
+      statusEl.textContent = 'Erreur : ' + ghLastError;
+      statusEl.className = 'sync-status error';
+    } else if (ghLastSyncAt) {
+      statusEl.textContent = 'Dernière synchro : ' + ghLastSyncAt.toLocaleTimeString('fr-FR');
+      statusEl.className = 'sync-status ok';
+    } else {
+      statusEl.textContent = 'Connecté — pas encore synchronisé';
+      statusEl.className = 'sync-status';
+    }
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem(STORAGE_SALARY_KEY);
     if (saved) document.getElementById('salary').value = saved;
     render();
+    renderSyncUI();
+    if (ghToken) ghPullData(false);
   });
 
-  function saveExpenses() {
+  function saveExpensesRaw() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+  }
+
+  function saveExpenses() {
+    saveExpensesRaw();
+    scheduleAutoSync();
   }
 
   function onSalaryChange() {
     localStorage.setItem(STORAGE_SALARY_KEY, document.getElementById('salary').value);
+    scheduleAutoSync();
     render();
   }
 
@@ -484,6 +746,8 @@
         columnsHtml += `<div class="expense-row${e.paid ? ' paid' : ''}" id="row-${e.id}">
           <input type="checkbox" class="expense-checkbox" ${e.paid ? 'checked' : ''}
             onchange="togglePaid(${e.id})" title="${e.paid ? 'Marquer comme non payé' : 'Marquer comme payé'}" />
+          <button class="tag-dot${e.tag ? ' tag-' + e.tag : ''}" onclick="cycleTag(${e.id})"
+            title="${e.tag === 'green' ? 'Tag vert — clic pour rouge' : e.tag === 'red' ? 'Tag rouge — clic pour retirer' : 'Ajouter un tag'}"></button>
           ${isEditingDesc
             ? `<input class="desc-input" id="input-desc-${e.id}" type="text"
                  value="${e.desc.replace(/"/g, '&quot;')}"
@@ -560,12 +824,20 @@
     render();
   }
 
+  function cycleTag(id) {
+    const e = expenses.find(e => e.id === id);
+    if (!e) return;
+    e.tag = e.tag === 'green' ? 'red' : e.tag === 'red' ? null : 'green';
+    saveExpenses();
+    render();
+  }
+
   function addExpense() {
     const desc   = document.getElementById('desc').value.trim();
     const amount = parseFloat(document.getElementById('amount').value);
     const cat    = document.getElementById('cat').value;
     if (!desc || isNaN(amount) || amount <= 0) return;
-    expenses.push({ id: Date.now(), desc, amount, cat, paid: false });
+    expenses.push({ id: Date.now(), desc, amount, cat, paid: false, tag: null });
     saveExpenses();
     document.getElementById('desc').value   = '';
     document.getElementById('amount').value = '';
@@ -585,19 +857,20 @@
     const total   = expenses.reduce((s, e) => s + e.amount, 0);
     const restant = expenses.reduce((s, e) => s + (e.paid ? 0 : e.amount), 0);
     const salary  = parseFloat(document.getElementById('salary').value) || 0;
-    const rows    = [['#', 'Description', 'Catégorie', 'Montant (€)', 'Payé']];
+    const rows    = [['#', 'Description', 'Catégorie', 'Montant (€)', 'Payé', 'Tag']];
     let i = 1;
     CATS.forEach(cat => {
       expenses.filter(e => e.cat === cat).forEach(e => {
-        rows.push([i++, e.desc, e.cat, e.amount.toFixed(2).replace('.', ','), e.paid ? 'Oui' : 'Non']);
+        const tagStr = e.tag === 'green' ? 'Vert' : e.tag === 'red' ? 'Rouge' : '';
+        rows.push([i++, e.desc, e.cat, e.amount.toFixed(2).replace('.', ','), e.paid ? 'Oui' : 'Non', tagStr]);
       });
     });
     rows.push(
       [],
-      ['', 'Total dépenses',  '', total.toFixed(2).replace('.', ','), ''],
-      ['', 'Reste à payer',   '', restant.toFixed(2).replace('.', ','), ''],
-      ['', 'Salaire net',     '', salary.toFixed(2).replace('.', ','), ''],
-      ['', 'Épargne',         '', (salary - total).toFixed(2).replace('.', ','), '']
+      ['', 'Total dépenses',  '', total.toFixed(2).replace('.', ','), '', ''],
+      ['', 'Reste à payer',   '', restant.toFixed(2).replace('.', ','), '', ''],
+      ['', 'Salaire net',     '', salary.toFixed(2).replace('.', ','), '', ''],
+      ['', 'Épargne',         '', (salary - total).toFixed(2).replace('.', ','), '', '']
     );
     const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -640,12 +913,14 @@
       lines.forEach(line => {
         const cells = parseCSVLine(line).map(c => c.trim());
         if (cells.length < 4) return;
-        const [num, desc, cat, montant, payeStr] = cells;
+        const [num, desc, cat, montant, payeStr, tagStr] = cells;
         const amount = parseFloat(montant.replace(/\s/g, '').replace(',', '.'));
 
         if (/^\d+$/.test(num) && desc && CATS.includes(cat) && !isNaN(amount) && amount > 0) {
           const paid = (payeStr || '').trim().toLowerCase() === 'oui';
-          imported.push({ id: Date.now() + imported.length, desc, amount, cat, paid });
+          const tagNorm = (tagStr || '').trim().toLowerCase();
+          const tag = tagNorm === 'vert' ? 'green' : tagNorm === 'rouge' ? 'red' : null;
+          imported.push({ id: Date.now() + imported.length, desc, amount, cat, paid, tag });
         } else if (desc === 'Salaire net' && !isNaN(amount) && amount > 0) {
           importedSalary = amount;
         }
