@@ -209,11 +209,29 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      transition: color 0.15s;
+      transition: color 0.15s, background 0.15s;
+      cursor: pointer;
+      border-radius: 5px;
+      padding: 2px 5px;
+      margin: 0 -5px;
     }
+    .expense-desc:hover { background: var(--surface-2); }
 
     .expense-row.paid .expense-desc { color: var(--text-muted); text-decoration: line-through; }
     .expense-row.paid .amount-display { color: var(--text-muted); }
+
+    .desc-input {
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text-primary);
+      flex: 1;
+      min-width: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      padding: 2px 5px;
+      outline: none;
+    }
 
     .amount-display {
       font-size: 13px;
@@ -359,6 +377,7 @@
 
   let expenses  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   let editingId = null;
+  let editingField = null; // 'amount' | 'desc'
 
   window.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem(STORAGE_SALARY_KEY);
@@ -446,17 +465,24 @@
         </div>`;
 
       items.slice().reverse().forEach(e => {
-        const isEditing = editingId === e.id;
+        const isEditingDesc   = editingId === e.id && editingField === 'desc';
+        const isEditingAmount = editingId === e.id && editingField === 'amount';
         html += `<div class="expense-row${e.paid ? ' paid' : ''}" id="row-${e.id}">
           <input type="checkbox" class="expense-checkbox" ${e.paid ? 'checked' : ''}
             onchange="togglePaid(${e.id})" title="${e.paid ? 'Marquer comme non payé' : 'Marquer comme payé'}" />
-          <span class="expense-desc" title="${e.desc}">${e.desc}</span>
-          ${isEditing
+          ${isEditingDesc
+            ? `<input class="desc-input" id="input-desc-${e.id}" type="text"
+                 value="${e.desc.replace(/"/g, '&quot;')}"
+                 onblur="commitEdit(${e.id})"
+                 onkeydown="onEditKey(event, ${e.id})" />`
+            : `<span class="expense-desc" onclick="startEdit(${e.id}, 'desc')" title="Cliquer pour modifier">${e.desc}</span>`
+          }
+          ${isEditingAmount
             ? `<input class="amount-input" id="input-${e.id}" type="number"
                  value="${e.amount}" min="0" step="0.01"
                  onblur="commitEdit(${e.id})"
                  onkeydown="onEditKey(event, ${e.id})" />`
-            : `<span class="amount-display" onclick="startEdit(${e.id})" title="Cliquer pour modifier">${fmt(e.amount)}</span>`
+            : `<span class="amount-display" onclick="startEdit(${e.id}, 'amount')" title="Cliquer pour modifier">${fmt(e.amount)}</span>`
           }
           <button class="delete-btn" onclick="deleteExpense(${e.id})" aria-label="Supprimer">✕</button>
         </div>`;
@@ -473,31 +499,43 @@
     list.innerHTML = html;
 
     if (editingId !== null) {
-      const inp = document.getElementById(`input-${editingId}`);
+      const inputId = editingField === 'desc' ? `input-desc-${editingId}` : `input-${editingId}`;
+      const inp = document.getElementById(inputId);
       if (inp) { inp.focus(); inp.select(); }
     }
   }
 
-  function startEdit(id) {
+  function startEdit(id, field) {
     editingId = id;
+    editingField = field;
     render();
   }
 
   function commitEdit(id) {
-    const inp = document.getElementById(`input-${id}`);
-    if (!inp) return;
-    const val = parseFloat(inp.value);
-    if (!isNaN(val) && val > 0) {
-      const e = expenses.find(e => e.id === id);
-      if (e) { e.amount = val; saveExpenses(); }
+    const e = expenses.find(e => e.id === id);
+    if (e) {
+      if (editingField === 'desc') {
+        const inp = document.getElementById(`input-desc-${id}`);
+        if (inp) {
+          const val = inp.value.trim();
+          if (val) { e.desc = val; saveExpenses(); }
+        }
+      } else {
+        const inp = document.getElementById(`input-${id}`);
+        if (inp) {
+          const val = parseFloat(inp.value);
+          if (!isNaN(val) && val > 0) { e.amount = val; saveExpenses(); }
+        }
+      }
     }
     editingId = null;
+    editingField = null;
     render();
   }
 
   function onEditKey(event, id) {
     if (event.key === 'Enter')  commitEdit(id);
-    if (event.key === 'Escape') { editingId = null; render(); }
+    if (event.key === 'Escape') { editingId = null; editingField = null; render(); }
   }
 
   function togglePaid(id) {
