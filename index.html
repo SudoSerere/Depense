@@ -34,7 +34,7 @@
       padding: 2rem 1rem;
     }
 
-    .container { max-width: 920px; margin: 0 auto; }
+    .container { max-width: 1280px; margin: 0 auto; }
 
     header { margin-bottom: 2rem; }
     header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
@@ -142,6 +142,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-bottom: 12px;
     }
 
@@ -160,9 +162,21 @@
     .export-btn:hover    { background: var(--border); }
     .export-btn:disabled { opacity: 0.4; cursor: default; }
 
-    /* Category sections */
-    .cat-section { margin-bottom: 14px; }
-    .cat-section:last-child { margin-bottom: 0; }
+    /* Category columns — side by side on wide screens, stacked (and page-scrollable) on narrow ones */
+    .cat-columns {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0 20px;
+      align-items: start;
+    }
+
+    .cat-section {
+      margin-bottom: 14px;
+      min-width: 0; /* allow ellipsis truncation to work inside grid items */
+    }
+    .cat-columns:not(:has(.cat-section:nth-child(2))) .cat-section {
+      max-width: 420px;
+    }
 
     .cat-label {
       font-size: 11px;
@@ -451,14 +465,14 @@
       return;
     }
 
-    let html = '';
+    let columnsHtml = '';
 
     CATS.forEach(cat => {
       const items = expenses.filter(e => e.cat === cat);
       if (!items.length) return;
       const catTotal = items.reduce((s, e) => s + e.amount, 0);
 
-      html += `<div class="cat-section">
+      columnsHtml += `<div class="cat-section">
         <div class="cat-label">
           <span>${cat}</span>
           <span class="cat-label-total">${fmt(catTotal)}</span>
@@ -467,7 +481,7 @@
       items.slice().reverse().forEach(e => {
         const isEditingDesc   = editingId === e.id && editingField === 'desc';
         const isEditingAmount = editingId === e.id && editingField === 'amount';
-        html += `<div class="expense-row${e.paid ? ' paid' : ''}" id="row-${e.id}">
+        columnsHtml += `<div class="expense-row${e.paid ? ' paid' : ''}" id="row-${e.id}">
           <input type="checkbox" class="expense-checkbox" ${e.paid ? 'checked' : ''}
             onchange="togglePaid(${e.id})" title="${e.paid ? 'Marquer comme non payé' : 'Marquer comme payé'}" />
           ${isEditingDesc
@@ -488,8 +502,10 @@
         </div>`;
       });
 
-      html += `</div>`;
+      columnsHtml += `</div>`;
     });
+
+    let html = `<div class="cat-columns">${columnsHtml}</div>`;
 
     html += `<div class="total-row">
       <span>Total</span>
