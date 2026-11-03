@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T00:00:00Z",
+  "title": "Design System: Mes dépenses",
+  "extensions": {
+    "colorMeta": {
+      "postal-ink": { "role": "primary", "displayName": "Postal Ink", "canonical": "#1C3F6E", "tonalRamp": ["#132439", "#203E66", "#2B5996", "#3573C6", "#6192D5", "#91B2DF", "#BFD2EB", "#ECF1F9"] },
+      "ledger-red": { "role": "secondary", "displayName": "Ledger Red", "canonical": "#A8352A", "tonalRamp": ["#391713", "#672620", "#96342B", "#C74134", "#D56A60", "#DF9791", "#EBC3BF", "#F9EDEC"] },
+      "stamp-green": { "role": "secondary", "displayName": "Stamp Green", "canonical": "#1D5B3A", "tonalRamp": ["#163725", "#256241", "#328F5E", "#3EBD7A", "#68CD98", "#96DAB6", "#C2E8D4", "#EDF8F2"] },
+      "desk-grey": { "role": "neutral", "displayName": "Desk Grey", "canonical": "#EEF0F0", "tonalRamp": ["#242828", "#404747", "#5B6666", "#768585", "#95A1A1", "#B4BCBC", "#D3D7D7", "#F2F3F3"] },
+      "graphite-ink": { "role": "neutral", "displayName": "Graphite Ink", "canonical": "#20242B" },
+      "faint-slate": { "role": "neutral", "displayName": "Faint Slate", "canonical": "#66707F" },
+      "rule-line": { "role": "neutral", "displayName": "Rule Line", "canonical": "#CCD4DE" }
+    },
+    "typographyMeta": {
+      "figure": { "displayName": "Figure (mono)", "purpose": "Every amount, total, and the salary input — tabular, ledger-column alignment." },
+      "label": { "displayName": "Label", "purpose": "Section headers, field labels, category tabs, masthead month line." }
+    },
+    "shadows": [
+      { "name": "ledger-lift", "value": "0 1px 2px rgba(20, 44, 78, 0.05), 0 6px 16px -4px rgba(20, 44, 78, 0.08)", "purpose": "The single authored shadow in the system — the right-hand ledger card, read as paper lifted off the desk. Never reused elsewhere." }
+    ],
+    "motion": [
+      { "name": "stamp-in", "value": "stampIn 0.16s ease-out (scale 0.3→1, opacity 0→1, on the checkbox's check glyph)", "purpose": "The one signature motion moment: marking an expense paid reads as a ledger entry being stamped settled." },
+      { "name": "row-fade-in", "value": "fadeIn 0.18s ease (translateY -4px → 0, opacity 0 → 1)", "purpose": "New expense rows entering the ledger." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "680px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ajouter / Connecter — postal-ink fill, icon + label.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"><path d=\"M8 2v12M2 8h12\"/></svg>Ajouter</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; color: #fff; background: #1C3F6E; border: none; border-radius: 3px; padding: 9px 18px; cursor: pointer; transition: background 0.15s; } .ds-btn-primary:hover { background: #142C4E; } .ds-btn-primary:focus-visible { outline: 2px solid #1C3F6E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Importer/Exporter CSV, actions de synchro — inverse au survol.",
+      "html": "<button class=\"ds-btn-secondary\">Exporter CSV</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 500; color: #566070; background: #EDF0F5; border: 1px solid #CCD4DE; border-radius: 3px; padding: 5px 10px; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; } .ds-btn-secondary:hover { background: #1C3F6E; color: #fff; border-color: #1C3F6E; }"
+    },
+    {
+      "name": "Category Tab",
+      "kind": "chip",
+      "refersTo": "category-tab",
+      "description": "Étiquette de catégorie sur la règle de la page de grand livre.",
+      "html": "<div class=\"ds-cat-label\"><span class=\"ds-cat-tab\">CHARGES</span><span class=\"ds-cat-total\">953,90 €</span></div>",
+      "css": ".ds-cat-label { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #1C3F6E; margin-bottom: 8px; } .ds-cat-tab { font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; background: #1C3F6E; padding: 4px 9px; border-radius: 2px 2px 0 0; line-height: 1; } .ds-cat-total { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #20242B; padding-bottom: 7px; }"
+    },
+    {
+      "name": "Stamped Checkbox",
+      "kind": "input",
+      "refersTo": "checkbox-paid",
+      "description": "Case à cocher 'payé' restylée en tampon d'encre vert.",
+      "html": "<input type=\"checkbox\" class=\"ds-checkbox\" checked />",
+      "css": ".ds-checkbox { appearance: none; width: 16px; height: 16px; border: 1.5px solid #CCD4DE; border-radius: 2px; background: #fff; position: relative; cursor: pointer; transition: background 0.15s, border-color 0.15s; } .ds-checkbox:hover { border-color: #1D5B3A; } .ds-checkbox:checked { background: #1D5B3A; border-color: #1D5B3A; } .ds-checkbox:checked::after { content: ''; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); } .ds-checkbox:focus-visible { outline: 2px solid #1C3F6E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Tag Dot",
+      "kind": "chip",
+      "refersTo": "tag-dot",
+      "description": "Tag couleur libre (vert/rouge/aucun) — cercle, volontairement distinct de la case à cocher carrée.",
+      "html": "<button class=\"ds-tag-dot ds-tag-green\"></button>",
+      "css": ".ds-tag-dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #CCD4DE; background: transparent; cursor: pointer; padding: 0; transition: transform 0.1s, border-color 0.15s; } .ds-tag-dot:hover { transform: scale(1.15); } .ds-tag-dot.ds-tag-green { background: #1D5B3A; border-color: #1D5B3A; } .ds-tag-dot.ds-tag-red { background: #A8352A; border-color: #A8352A; }"
+    },
+    {
+      "name": "Ledger Text Input",
+      "kind": "input",
+      "refersTo": "text-input",
+      "description": "Champ texte/nombre sans boîte — une seule règle en bas, qui se colore au focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"ex : loyer\" />",
+      "css": ".ds-input { font-family: Inter, sans-serif; font-size: 14px; color: #20242B; background: transparent; border: none; border-bottom: 1.5px solid #CCD4DE; border-radius: 0; padding: 6px 2px; width: 100%; outline: none; transition: border-color 0.15s; } .ds-input::placeholder { color: #66707F; } .ds-input:focus { border-color: #1C3F6E; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Panneau de formulaire ou page de grand livre — bordé, plat, un seul coin légèrement arrondi.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Salaire net</div></div>",
+      "css": ".ds-card { background: #fff; border: 1px solid #CCD4DE; border-radius: 3px; padding: 16px 18px; } .ds-card-title { font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #66707F; margin-bottom: 10px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le Cahier du Mois",
+    "overview": "This is the French household ledger-and-wall-register the budgeting ritual already runs on, rebuilt as a screen — not another neutral SaaS dashboard wearing a single accent color as personality. Every month the page opens on its own register line (\"Cahier de Novembre 2026\"), and the body reads like an account book: a committed postal-ink blue owns the shell and the category tabs, figures run in a tabular monospace like a real ledger's number column, and red is spent on exactly one thing — what is still owed. The system refuses two defaults at once: the \"grey cards, one thin accent\" dashboard rut (what this app's own first version was), and the warm-cream-serif rut most AI-generated interfaces reach for when given a free hand.",
+    "keyCharacteristics": [
+      "Ink-on-paper palette: postal-ink blue as the only structural color, ledger red and stamp green reserved strictly for meaning (due / settled), never decoration.",
+      "Two type voices with a functional split: Inter carries every word, IBM Plex Mono carries every number.",
+      "Flat, ruled surfaces — no card-grid cliché, no rounded pill shapes, no soft decorative shadows except the one real paper-lift under the ledger itself.",
+      "Desktop-led, mobile-honest: the same ruled-ledger language collapses to a single stacked column on narrow viewports without losing any figure."
+    ],
+    "rules": [
+      { "name": "The One Red Rule", "body": "Red appears on at most one live figure at a time — the amount still owed. A page with two red numbers has stopped meaning anything.", "section": "colors" },
+      { "name": "The One Voice Rule", "body": "Postal ink blue is the system's only decorative color. Everything else is either structural neutral or strictly meaning-bearing. A third decorative color is a system violation, not a variant.", "section": "colors" },
+      { "name": "The Ledger-Column Rule", "body": "Any value that is a sum of money is set in IBM Plex Mono with tabular-nums, full stop — never the body font, never proportional figures.", "section": "typography" },
+      { "name": "The One Lift Rule", "body": "Exactly one region of the page gets a shadow: the ledger itself. A shadow anywhere else is decoration creeping back in.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep red to exactly one live meaning: money still owed. Never use it for error states — those get slate/graphite, not red.",
+      "Do set every currency figure in IBM Plex Mono with tabular numerals, never the body font.",
+      "Do keep every icon as an authored inline SVG in one consistent stroke — never a unicode glyph or emoji standing in for one.",
+      "Do theme focus rings, selection color, and the checkbox's check mark from the postal-ink/stamp-green palette — never leave a browser default un-themed."
+    ],
+    "donts": [
+      "Don't introduce a third decorative color beyond postal-ink.",
+      "Don't round a corner past 3px.",
+      "Don't add a shadow anywhere but the right-hand ledger card.",
+      "Don't reach for a boxed/bordered input style for text or number fields — the bottom-rule treatment is the system's signature."
+    ]
+  }
+}

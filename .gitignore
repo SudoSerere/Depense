@@ -1,0 +1,7 @@
+# Impeccable skill tooling — local to the session that installed it, not project content
+.claude/
+
+# Impeccable runtime state — ephemeral (QA screenshots, direction-roll records)
+.impeccable/review/
+.impeccable/questions/
+.impeccable/build/
